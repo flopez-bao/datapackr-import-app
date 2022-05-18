@@ -1,5 +1,5 @@
 #' @export
-#' @title prep_json(data)
+#' @title prepJson(data)
 #'
 #' @description Preps a json file based off the import files as data inputs. These are the jsons that are imported.
 #'
@@ -7,7 +7,7 @@
 #'
 #' @return data
 #'
-prep_json <- function(data) {
+prepJson <- function(data) {
   
   pl <- jsonlite::toJSON(list(dataValues = data), auto_unbox = TRUE)
   

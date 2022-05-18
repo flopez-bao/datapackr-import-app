@@ -248,8 +248,8 @@ server <- function(input, output, session) {
       
       paste0(
         "Tool loaded: ", validation_results$datapack$info$tool,
-        " Name: ", validation_results$datapack$info$datapack_name,
-        " COP Year: ", validation_results$datapack$info$cop_year
+        "; Name: ", validation_results$datapack$info$datapack_name,
+        "; COP Year: ", validation_results$datapack$info$cop_year
       )
       
     } 

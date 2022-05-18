@@ -2,4 +2,4 @@
 
 export(getTaskSummary)
 export(pollImportStatus)
-export(prep_json)
+export(prepJson)
