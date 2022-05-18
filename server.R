@@ -3,6 +3,9 @@ library(futile.logger)
 library(shinyWidgets)
 library(datimutils)
 library(shinyjs)
+library(datapackr)
+
+options("scipen" = 999)
 
 # js ----
 # allows for using the enter button
@@ -20,6 +23,13 @@ server <- function(input, output, session) {
   # data ----
   user <- reactiveValues(type = NULL)
   route <- reactiveValues(route = "triage")
+  validation_results <- reactiveValues(datapack = NULL)
+  ready <- reactiveValues(ok = FALSE)
+  # import files
+  main_import_json <- reactiveVal
+  deletes_json <- reactiveVal()
+  dedupes_00000_json <- reactiveVal()
+  dedupes_00001_json <- reactiveVal()
   
   # user information
   user_input  <-  reactiveValues(
@@ -64,6 +74,7 @@ server <- function(input, output, session) {
   output$authenticated <- renderUI({
     fluidPage(
       sidebarPanel(
+        shinyjs::useShinyjs(),
         id = "side-panel",
         fileInput(
           "file1",
@@ -75,15 +86,23 @@ server <- function(input, output, session) {
         # unpack and return all the warnings and messages
         actionButton("validate", "Validate"),
         # import into the respective server
-        actionButton("import", "Import")
+        actionButton("import", "Import"),
+        # FOR TESTING - eliminate when prod
+        actionButton("test", "TEST SOMETHING")
       ),
-      fluidRow(h1(
-      paste0(
-        "You are currently logged into the ",
-        input$server,
-        " DATIM server."
-      )
-    )),
+      fluidRow(
+        h1(
+          paste0(
+            "You are currently logged into the ",
+            input$server,
+            " DATIM server."
+          )
+        ),
+        uiOutput("info")
+      ),
+      fluidRow(
+        uiOutput("messages")
+      ),
     fluidRow(column(
       actionButton("logout_button", "Log out of Session", style = "color: #fff; background-color: #FF0000; border-color: #2e6da4"),
       width = 6
@@ -222,6 +241,207 @@ server <- function(input, output, session) {
     }
   })
   
+  ## datapack info ----
+  output$info <- renderUI({
+    
+    if(!is.null(validation_results$datapack)) {
+      
+      paste0(
+        "Tool loaded: ", validation_results$datapack$info$tool,
+        " Name: ", validation_results$datapack$info$datapack_name,
+        " COP Year: ", validation_results$datapack$info$cop_year
+      )
+      
+    } 
+    
+  })
+  
+  # button management ----
+  observeEvent(input$file1, {
+    shinyjs::show("validate")
+    shinyjs::enable("validate")
+    ready$ok <- FALSE
+  })
+  
+  # validation ----
+  observeEvent(input$validate, {
+    
+    # disable buttons
+    shinyjs::disable("file1")
+    shinyjs::disable("validate")
+    ready$ok <- TRUE
+    
+    inFile <- input$file1
+    messages <- ""
+    
+    print("unpacking...")
+    print(input$file1)
+    
+    withProgress(message = "Validating file", value = 0, {
+      
+      incProgress(0.1, detail = ("Unpacking your DataPack"))
+      
+      
+      d <- tryCatch({
+        datapackr::unPackTool(inFile$datapath,
+                              d2_session = user_input$d2_session)},
+        error = function(e) {
+          return(e)
+        })
+      
+      if (inherits(d, "error")) {
+        return("An error occurred. Please contact DATIM support.")
+      }
+    })
+    
+    #Create some additional metadadta for S3 tagging
+    d$info$sane_name <-
+      paste0(stringr::str_extract_all(d$info$datapack_name,
+                                      "[A-Za-z0-9_]",
+                                      simplify = TRUE),
+             sep = "", collapse = "")
+    if (is.null(d$info$sane_name)) {
+      stop("sane_name cannot be NULL!")
+    }
+    d$info$source_user <- user_input$d2_session$username
+    if (is.null(d$info$source_user)) {
+      stop("source_user cannot be NULL!")
+    }
+    
+    #All self-service datapacks should be marked as unapproved for PAW
+    d$info$approval_status <- "APPROVED"
+    #Generate a unique identifier
+    d$info$uuid <- uuid::UUIDgenerate()
+    
+    if (d$info$tool ==  "Data Pack") {
+      
+      print("Datapack")
+      
+      # differences between datapack and datim at start of import
+      # baseline_diff <- compareData_DatapackVsDatim(d)
+      # 
+      
+      # extract data for import
+      data <- d$datim$MER %>% 
+        dplyr::bind_rows(d$datim$subnat_impatt)
+      
+      #Remap mech codes to UIDs
+      
+      data$attributeOptionCombo <-
+        datimvalidation::remapCategoryOptionCombos(data$attributeOptionCombo,
+                                                   "code", "id", d2session = user_input$d2_session)
+      
+      # double check all category option combos are uids, no "default" or mech codes
+      assertthat::assert_that(
+        all(datapackr::is_uidish(data$attributeOptionCombo)))
+      assertthat::assert_that(
+        all(datapackr::is_uidish(data$categoryOptionCombo)))
+      
+      # drop dedupe from main import
+      main_import <-
+        dplyr::filter(data,
+                      !(attributeOptionCombo %in% c("X8hrDf6bLDC",
+                                                    "YGT1o7UxfFu"))) %>%
+        dplyr::mutate(value = as.character(value))
+      
+      dedupes_00000 <- dplyr::filter(data,
+                                                   attributeOptionCombo == "X8hrDf6bLDC")
+      
+      dedupes_00001 <- dplyr::filter(data,
+                                                   attributeOptionCombo == "YGT1o7UxfFu")
+      
+      # delete prior cop subnat data
+      # delete any pre existing COP22 data, generally only has impact
+      # if we are reloading the DP
+      #TODO: d2_session needs to be changed to be consistent with d2sessions, we need to choose one
+      deletes <- datapackr::getCOPDataFromDATIM(d$info$country_uids,
+                                                        cop_year = 2021,
+                                                        datastreams = c("subnat_targets"),
+                                                        d2_session = user_input$d2_session
+      ) %>% 
+        dplyr::bind_rows(datapackr::getCOPDataFromDATIM(d$info$country_uids,
+                                                        cop_year = 2022,
+                                                        d2_session = user_input$d2_session)
+        ) %>%
+        dplyr::mutate(attributeOptionCombo =
+                        datimvalidation::remapCategoryOptionCombos(
+                          attributeOptionCombo,
+                          "code",
+                          "id",
+                          d2session = user_input$d2_session),
+                      categoryOptionCombo =
+                        datimvalidation::remapCategoryOptionCombos(
+                          categoryOptionCombo,
+                          "code",
+                          "id",
+                          d2session = user_input$d2_session)) %>%
+        dplyr::select(dataElement,
+                      period,
+                      orgUnit,
+                      categoryOptionCombo,
+                      attributeOptionCombo,
+                      value)
+    }
+    
+    
+    # generate json versions of the import files
+    print("generating json import files stored as reactive val...")
+    main_import_json(prep_json(main_import))
+    dedupes_00000_json(prep_json(dedupes_00000))
+    dedupes_00001_json(prep_json(dedupes_00001))
+    deletes_json(prep_json(deletes))
+    
+    
+    # pass entire d object to validation results
+    validation_results$datapack <- d
+    
+  })
+  
+  # messages ----
+  output$messages <- renderUI({
+    
+    vr <- validation_results$datapack
+    
+    messages <- NULL
+    
+    if (is.null(vr)) {
+      return(NULL)
+    }
+    
+    if (inherits(vr, "error")) {
+      return(paste0("ERROR! ", vr$message))
+      
+    } else {
+      
+      messages <- vr %>%
+        purrr::pluck(., "info") %>%
+        purrr::pluck(., "messages")
+      
+      
+      if (length(messages$message) > 0) {
+        
+        class(messages) <- "data.frame"
+        
+        messages %<>%
+          dplyr::mutate(level = factor(level, levels = c("ERROR", "WARNING", "INFO"))) %>%
+          dplyr::arrange(level) %>%
+          dplyr::mutate(msg_html =
+                          dplyr::case_when(
+                            level == "ERROR" ~ paste('<li><p style = "color:red"><b>', message, "</b></p></li>"),
+                            TRUE ~ paste("<li><p>", message, "</p></li>")
+                          ))
+        
+        messages_sorted <-
+          paste0("<ul>", paste(messages$msg_html, sep = "", collapse = ""), "</ul>")
+        
+        shiny::HTML(messages_sorted)
+      } else {
+        tags$li("No Issues with Integrity Checks: Congratulations!")
+      }
+    }
+    
+  })
+  
   ## logout process ----
   observeEvent(input$logout_button, {
     flog.info(
@@ -239,4 +459,11 @@ server <- function(input, output, session) {
     gc()
     session$reload()
   })
+  
+  ## TESTING
+  observeEvent(input$test, {
+    # test reactive value is captured
+    print(deletes_json())
+  })
 }
+
