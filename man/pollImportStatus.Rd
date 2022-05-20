@@ -4,7 +4,7 @@
 \alias{pollImportStatus}
 \title{pollImportStatus(r)}
 \usage{
-pollImportStatus(r)
+pollImportStatus(r, d2_session)
 }
 \arguments{
 \item{r}{The response from a post to DATIM.}

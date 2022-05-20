@@ -4,6 +4,7 @@ library(shinyWidgets)
 library(datimutils)
 library(shinyjs)
 library(datapackr)
+library(httr)
 
 options("scipen" = 999)
 
@@ -23,13 +24,12 @@ server <- function(input, output, session) {
   # data ----
   user <- reactiveValues(type = NULL)
   route <- reactiveValues(route = "triage")
-  validation_results <- reactiveValues(datapack = NULL)
   ready <- reactiveValues(ok = FALSE)
-  # import files
-  main_import_json <- reactiveVal
-  deletes_json <- reactiveVal()
-  dedupes_00000_json <- reactiveVal()
-  dedupes_00001_json <- reactiveVal()
+  validation_results <- reactiveValues(datapack = NULL)
+  
+  # import files json
+  import_files <- reactiveValues()
+  import_files_json <- reactiveValues()
   
   # user information
   user_input  <-  reactiveValues(
@@ -48,7 +48,7 @@ server <- function(input, output, session) {
       wellPanel(
       fluidRow(
         h4(
-          "Use this app to test DATIM imports in triage and conduct DATIM imports in production:"
+          "Use this app to test DATIM imports in triage and conduct DATIM imports in production (Currently only runs for datapacks):"
         ),
         br()
       ),
@@ -87,15 +87,19 @@ server <- function(input, output, session) {
         actionButton("validate", "Validate"),
         # import into the respective server
         actionButton("import", "Import"),
+        #download import json files
+        downloadButton("download", "Download")#,
         # FOR TESTING - eliminate when prod
-        actionButton("test", "TEST SOMETHING")
+        #actionButton("test", "TEST SOMETHING")
       ),
       fluidRow(
         h1(
           paste0(
             "You are currently logged into the ",
-            input$server,
-            " DATIM server."
+            input$server, 
+            " DATIM server ",
+            "at ",
+            user_input$d2_session$base_url
           )
         ),
         uiOutput("info")
@@ -233,6 +237,7 @@ server <- function(input, output, session) {
           name = "datapack"
         )
       }
+      
     } else {
       sendSweetAlert(session,
                      title = "Login failed",
@@ -269,6 +274,8 @@ server <- function(input, output, session) {
     # disable buttons
     shinyjs::disable("file1")
     shinyjs::disable("validate")
+    shinyjs::disable("import")
+    shinyjs::disable("download")
     ready$ok <- TRUE
     
     inFile <- input$file1
@@ -277,9 +284,9 @@ server <- function(input, output, session) {
     print("unpacking...")
     print(input$file1)
     
-    withProgress(message = "Validating file", value = 0, {
+    withProgress(message = "importing data...", value = 0, {
       
-      incProgress(0.1, detail = ("Unpacking your DataPack"))
+      incProgress(0.3, detail = ("Unpacking your DataPack..."))
       
       
       d <- tryCatch({
@@ -292,7 +299,6 @@ server <- function(input, output, session) {
       if (inherits(d, "error")) {
         return("An error occurred. Please contact DATIM support.")
       }
-    })
     
     #Create some additional metadadta for S3 tagging
     d$info$sane_name <-
@@ -313,6 +319,7 @@ server <- function(input, output, session) {
     #Generate a unique identifier
     d$info$uuid <- uuid::UUIDgenerate()
     
+    incProgress(0.3, detail = ("Building import files..."))
     if (d$info$tool ==  "Data Pack") {
       
       print("Datapack")
@@ -344,11 +351,9 @@ server <- function(input, output, session) {
                                                     "YGT1o7UxfFu"))) %>%
         dplyr::mutate(value = as.character(value))
       
-      dedupes_00000 <- dplyr::filter(data,
-                                                   attributeOptionCombo == "X8hrDf6bLDC")
+      dedupes_00000 <- dplyr::filter(data, attributeOptionCombo == "X8hrDf6bLDC")
       
-      dedupes_00001 <- dplyr::filter(data,
-                                                   attributeOptionCombo == "YGT1o7UxfFu")
+      dedupes_00001 <- dplyr::filter(data, attributeOptionCombo == "YGT1o7UxfFu")
       
       # delete prior cop subnat data
       # delete any pre existing COP22 data, generally only has impact
@@ -383,18 +388,42 @@ server <- function(input, output, session) {
                       value)
     }
     
+    incProgress(0.3, detail = ("Finishing up..."))
+    print("generating json import files stored as reactive val...")
+    
+    # store raw files
+    import_files$deletes <- deletes
+    import_files$main_import <- main_import
+    import_files$dedupes_00000 <- dedupes_00000
+    import_files$dedupes_00001 <- dedupes_00001
     
     # generate json versions of the import files
-    print("generating json import files stored as reactive val...")
-    main_import_json(prep_json(main_import))
-    dedupes_00000_json(prep_json(dedupes_00000))
-    dedupes_00001_json(prep_json(dedupes_00001))
-    deletes_json(prep_json(deletes))
-    
+    import_files_json$deletes_json <- prepJson(import_files$deletes)
+    import_files_json$main_import_json <- prepJson(import_files$main_import)
+    import_files_json$dedupes_00000_json <- prepJson(import_files$dedupes_00000)
+    import_files_json$dedupes_00001_json <- prepJson(import_files$dedupes_00001)
     
     # pass entire d object to validation results
     validation_results$datapack <- d
     
+    # renable buttons
+    shinyjs::enable("import")
+    shinyjs::enable("download")
+    ready$ok <- TRUE
+    
+    })
+    
+  })
+  
+  # import ----
+  observeEvent(input$import, {
+    print("attempting import...")
+    importToDatim(
+      d = validation_results$datapack,
+      server = input$server,
+      import_data = import_files_json,
+      d2session = user_input$d2_session
+    )
   })
   
   # messages ----
@@ -442,7 +471,43 @@ server <- function(input, output, session) {
     
   })
   
-  ## logout process ----
+  # download data ----
+  output$download <- downloadHandler(
+    filename = function(){
+      paste("import_files_", Sys.Date(), ".zip", sep = "")
+      
+    },
+    content = function(file) {
+      # go to a temp dir to avoid permission issues
+      temp_directory <- file.path(tempdir(), as.integer(Sys.time()))
+      dir.create(temp_directory)
+      dp_name <- validation_results$datapack$info$datapack_name
+      
+      # write deletes
+      deletes_name <- 
+      write(import_files_json$deletes_json[["pl"]], file.path(temp_directory, paste0("deletes_",dp_name,".json")))
+      
+      # write main import
+      write(import_files_json$main_import_json[["pl"]], file.path(temp_directory, paste0("main_import_",dp_name,".json")))
+      
+      # write dedupes 00000
+      write(import_files_json$dedupes_00000_json[["pl"]], file.path(temp_directory, paste0("dedupes_00000_",dp_name,".json")))
+      
+      # write dedupes 00001
+      write(import_files_json$dedupes_00001_json[["pl"]], file.path(temp_directory, paste0("dedupes_00001_",dp_name,".json")))
+      
+      # create the zip file
+      zip::zip(
+        zipfile = file,
+        files = dir(temp_directory),
+        root = temp_directory
+      )
+    }, contentType = "application/zip"
+  )
+  
+  
+  
+  # logout process ----
   observeEvent(input$logout_button, {
     flog.info(
       paste0(
@@ -460,10 +525,12 @@ server <- function(input, output, session) {
     session$reload()
   })
   
-  ## TESTING
-  observeEvent(input$test, {
+  # TESTING ----
+  #observeEvent(input$test, {
     # test reactive value is captured
-    print(deletes_json())
-  })
+    #print(user_input$d2_session$base_url)
+    #print(deletes_json())
+    #print(deletes())
+  #})
 }
 
