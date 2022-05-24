@@ -3,16 +3,15 @@
 #'
 #' @description runs import procedure for all data into DATIM.
 #'
+#' @param d the datapack object which holds all relevant datapack information and validation results.
 #' @param server the server we are importing to like triage or production.
-#' @param deletes_json the deletes json file used to delete existing data before import.
-#' @param main_import_json the main imports imported to datim.
-#' @param dedupes_00000_json the pure dedupe data 0000 imported to datim.
-#' @param dedupes_00001_json the pure dedupe data 0001 imported to datim.
+#' @param import_data_json the import data object which holds the 4 types of import data in its prepped json format.
+#' @param import_data the import data object which holds the 4 types of import data.
 #'
-#' @return data
+#' @return printed information.
 #'
 
-importToDatim <- function(d, server, import_data, d2session) {
+importToDatim <- function(d, server, import_data_json, import_data, d2session) {
   
   withProgress(message = "importing data", value = 0, {
     
@@ -25,7 +24,7 @@ importToDatim <- function(d, server, import_data, d2session) {
     paste0(
       d2session$base_url,
       "api/dataValueSets?importStrategy=DELETE&force=true&preheatCache=true&async=TRUE")
-  r <- httr::POST(url, body = import_data$deletes_json[["raw_file"]],
+  r <- httr::POST(url, body = import_data_json$deletes_json[["raw_file"]],
                   content_type_json(),
                   handle = d2session$handle)
   
@@ -35,7 +34,7 @@ importToDatim <- function(d, server, import_data, d2session) {
   print("getting task summary...")
   ts <- getTaskSummary(r, d2_session = d2session)
   print(ts)
-  if (ts$importCount$deleted != NROW(import_data$deletes_json[["pl"]])) {
+  if (ts$importCount$deleted != NROW(import_data$deletes)) {
     warning("Deleted count did not match the number of deletes!")
   }
   
@@ -47,7 +46,7 @@ importToDatim <- function(d, server, import_data, d2session) {
     paste0(
       d2session$base_url,
       "api/dataValueSets?importStrategy=CREATE_AND_UPDATE&force=true&preheatCache=true&async=TRUE")
-  r <- httr::POST(url, body = import_data$main_import_json[["raw_file"]],
+  r <- httr::POST(url, body = import_data_json$main_import_json[["raw_file"]],
                   content_type_json(),
                   handle = d2session$handle)
   
@@ -65,7 +64,7 @@ importToDatim <- function(d, server, import_data, d2session) {
     paste0(
       d2session$base_url,
       "api/dataValueSets?importStrategy=CREATE_AND_UPDATE&force=true&preheatCache=true&async=TRUE")
-  r <- httr::POST(url, body = import_data$dedupes_00000_json[["raw_file"]],
+  r <- httr::POST(url, body = import_data_json$dedupes_00000_json[["raw_file"]],
                   content_type_json(),
                   handle = d2session$handle)
   
@@ -83,7 +82,7 @@ importToDatim <- function(d, server, import_data, d2session) {
     paste0(
       d2session$base_url,
       "api/dataValueSets?importStrategy=CREATE_AND_UPDATE&force=true&preheatCache=true&async=TRUE")
-  r <- httr::POST(url, body = import_data$dedupes_00001_json[["raw_file"]],
+  r <- httr::POST(url, body = import_data_json$dedupes_00001_json[["raw_file"]],
                   content_type_json(),
                   handle = d2session$handle)
   # print import summary

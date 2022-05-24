@@ -4,21 +4,19 @@
 \alias{importToDatim}
 \title{import(server, deletes_json, main_import_json, dedupes_0000_json, dedupes_00001_json)}
 \usage{
-importToDatim(d, server, import_data, d2session)
+importToDatim(d, server, import_data_json, import_data, d2session)
 }
 \arguments{
+\item{d}{the datapack object which holds all relevant datapack information and validation results.}
+
 \item{server}{the server we are importing to like triage or production.}
 
-\item{deletes_json}{the deletes json file used to delete existing data before import.}
+\item{import_data_json}{the import data object which holds the 4 types of import data in its prepped json format.}
 
-\item{main_import_json}{the main imports imported to datim.}
-
-\item{dedupes_00000_json}{the pure dedupe data 0000 imported to datim.}
-
-\item{dedupes_00001_json}{the pure dedupe data 0001 imported to datim.}
+\item{import_data}{the import data object which holds the 4 types of import data.}
 }
 \value{
-data
+printed information.
 }
 \description{
 runs import procedure for all data into DATIM.
