@@ -8,7 +8,10 @@ library(httr)
 library(data.table)
 library(shinydashboard)
 
-options("scipen" = 999)
+options(
+  "scipen" = 999,
+  shiny.maxRequestSize=30*1024^2
+  )
 
 # js ----
 # allows for using the enter button
@@ -23,11 +26,7 @@ USER = "Global"
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
   
-  # data ----
-  
-  # btn data
-  validated <- 0
-  imported <- 0
+  # data and values ----
   
   # results and msgs
   user <- reactiveValues(type = NULL)
@@ -49,7 +48,7 @@ server <- function(input, output, session) {
   
   # ui ----
   
-  ## authentication screen ----
+  ## auth switch ----
   output$ui <- renderUI({
     if (user_input$authenticated == FALSE) {
       uiOutput("uiLogin")
@@ -61,36 +60,12 @@ server <- function(input, output, session) {
     }
   })
   
-  ## authentication sidebar  ----
-  output$ui_sidebar <- renderUI({
-    if (user_input$authenticated == FALSE) {
-      uiOutput("uiLoginSidebar")
-    } else {
-      uiOutput("authenticatedSidebar")
-    }
-  })
-  
-  ## authenticated  sidebar ----
-  output$authenticated_sidebar <- renderUI({
-    sidebarMenu(
-      menuItem("OPU Datapack Imports", tabName = "dashboard", icon = icon("dashboard"))
-    )
-  })
-  
-  ## login sidebar ----
-  output$uiLoginSidebar <- renderUI({
-    sidebarMenu(
-      menuItem("Login Screen", tabName = "login", icon = icon("dashboard"))
-    )
-  })
-  
-  
-  # login page with username and password
+  ## login screen ----
   output$uiLogin  <-  renderUI({
     # tabItems(
     #   tabItem(tabName = "login",
               fluidPage(
-                titlePanel(title = "OPU Datapack Import App"),
+                titlePanel(title = "Datapack Import App"),
                 tags$head(tags$script(HTML(jscode))),
                 wellPanel(
                   fluidRow(
@@ -111,7 +86,7 @@ server <- function(input, output, session) {
       # )
   })
   
-  # main screen ----
+  ## main screen ----
   output$authenticated <- renderUI({
     fluidPage(sidebarLayout(
       sidebarPanel(
@@ -145,16 +120,14 @@ server <- function(input, output, session) {
           shinyjs::disabled(
             downloadButton("download_i", "Download Console Output") 
           )
-          #uiOutput("download_i")
         ),
         br(),
         fluidRow(
           actionButton("logout_button", "Log out of Session", style = "color: #fff; background-color: #FF0000; border-color: #2e6da4")
         )
-        # FOR TESTING - eliminate when prod
-        #actionButton("test", "TEST SOMETHING")
       ),
-      mainPanel(fluidRow(h1(
+      mainPanel(
+        fluidRow(h1(
         paste0(
           "You are currently logged into the ",
           input$server,
@@ -162,56 +135,27 @@ server <- function(input, output, session) {
           "at ",
           user_input$d2_session$base_url
         )
+      )
       ),
-      uiOutput("info")),
-      # fluidRow(
-      #   textOutput("import_output")
-      # ),
+      uiOutput("info"),
+      br(),
       fluidRow(
         uiOutput("messages")
         )
       )
     ))
-    #fluidPage(
-      # sidebarPanel(
-      #   shinyjs::useShinyjs(),
-      #   id = "side-panel",
-      #   fileInput(
-      #     "file1",
-      #     "Choose DataPack (Must be XLSX!):",
-      #     accept = c("application/xlsx",
-      #                ".xlsx"),
-      #     width = "240px"
-      #   ),
-      #   # unpack and return all the warnings and messages
-      #   actionButton("validate", "Validate"),
-      #   # import into the respective server
-      #   actionButton("import", "Import"),
-      #   #download import json files
-      #   downloadButton("download", "Download"),
-      #   uiOutput("download_i")
-      #   # FOR TESTING - eliminate when prod
-      #   #actionButton("test", "TEST SOMETHING")
-      # ),
-    #   fluidRow(
-    #     h1(
-    #       paste0(
-    #         "You are currently logged into the ",
-    #         input$server, 
-    #         " DATIM server ",
-    #         "at ",
-    #         user_input$d2_session$base_url
-    #       )
-    #     ),
-    #     uiOutput("info")
-    #   ),
-    #   fluidRow(
-    #     uiOutput("messages")
-    #   ),
-    # fluidRow(column(
-    #   actionButton("logout_button", "Log out of Session", style = "color: #fff; background-color: #FF0000; border-color: #2e6da4"),
-    #   width = 6
-    # )))
+  })
+  
+  ## datapack info ----
+  output$info <- renderUI({
+    if (!is.null(validation_results$datapack)) {
+      fluidRow(
+        h4("Tool loaded: ", validation_results$datapack$info$tool),
+        h4("Name: ", validation_results$datapack$info$datapack_name),
+        h4("COP Year: ", validation_results$datapack$info$cop_year)
+      )
+    }
+    
   })
   
   # actions ----
@@ -347,26 +291,42 @@ server <- function(input, output, session) {
     }
   })
   
-  ## datapack info ----
-  output$info <- renderUI({
-    
-    if(!is.null(validation_results$datapack)) {
-      
+  ## logout process ----
+  observeEvent(input$logout_button, {
+    flog.info(
       paste0(
-        "Tool loaded: ", validation_results$datapack$info$tool,
-        "; Name: ", validation_results$datapack$info$datapack_name,
-        "; COP Year: ", validation_results$datapack$info$cop_year
+        "User ",
+        user_input$d2_session$me$userCredentials$username,
+        " logged out."
       )
-      
-    } 
-    
+    )
+    user_input$authenticated  <-  FALSE
+    user_input$user_name <- ""
+    user_input$authorized  <-  FALSE
+    user_input$d2_session  <-  NULL
+    d2_default_session <- NULL
+    gc()
+    session$reload()
   })
+  
+
   
   # button management ----
   
+  ## turn on validate ----
   observeEvent(input$file1, {
     shinyjs::enable("validate")
   })
+  
+  ## download button ----
+  output$download_i <- downloadHandler(
+    filename = function() {
+      paste0(validation_results$datapack$info$datapack_name,'_console_output_', Sys.Date(), '.csv', sep = '')
+    },
+    content = function(con) {
+      fwrite(validation_results$import, con)
+    }
+  )
   
   ## validation ----
   observeEvent(input$validate, {
@@ -419,6 +379,41 @@ server <- function(input, output, session) {
     
   })
   
+  ## download data ----
+  output$download <- downloadHandler(
+    filename = function(){
+      paste0(validation_results$datapack$info$datapack_name,"_import_files_", Sys.Date(), ".zip", sep = "")
+      
+    },
+    content = function(file) {
+      # go to a temp dir to avoid permission issues
+      temp_directory <- file.path(tempdir(), as.integer(Sys.time()))
+      dir.create(temp_directory)
+      dp_name <- validation_results$datapack$info$datapack_name
+      
+      # write deletes
+      deletes_name <- 
+        write(import_files_json$deletes_json[["pl"]], file.path(temp_directory, paste0("deletes_",dp_name,".json")))
+      
+      # write main import
+      write(import_files_json$main_import_json[["pl"]], file.path(temp_directory, paste0("main_import_",dp_name,".json")))
+      
+      # write dedupes 00000
+      write(import_files_json$dedupes_00000_json[["pl"]], file.path(temp_directory, paste0("dedupes_00000_",dp_name,".json")))
+      
+      # write dedupes 00001
+      write(import_files_json$dedupes_00001_json[["pl"]], file.path(temp_directory, paste0("dedupes_00001_",dp_name,".json")))
+      
+      # create the zip file
+      zip::zip(
+        zipfile = file,
+        files = dir(temp_directory),
+        root = temp_directory
+      )
+    }, contentType = "application/zip"
+  )
+  
+  
   # results ----
   output$results <- renderUI({
     ir <- validation_results$import
@@ -431,11 +426,9 @@ server <- function(input, output, session) {
       unlist(as.character(ir))
     }
     
-    
-    
   })
   
-  # messages ----
+  ## messages ----
   output$messages <- renderUI({
       
       vr <- validation_results$datapack
@@ -480,89 +473,37 @@ server <- function(input, output, session) {
    
     
   })
-  
-  # download data ----
-  output$download <- downloadHandler(
-    filename = function(){
-      paste("import_files_", Sys.Date(), ".zip", sep = "")
-      
-    },
-    content = function(file) {
-      # go to a temp dir to avoid permission issues
-      temp_directory <- file.path(tempdir(), as.integer(Sys.time()))
-      dir.create(temp_directory)
-      dp_name <- validation_results$datapack$info$datapack_name
-      
-      # write deletes
-      deletes_name <- 
-      write(import_files_json$deletes_json[["pl"]], file.path(temp_directory, paste0("deletes_",dp_name,".json")))
-      
-      # write main import
-      write(import_files_json$main_import_json[["pl"]], file.path(temp_directory, paste0("main_import_",dp_name,".json")))
-      
-      # write dedupes 00000
-      write(import_files_json$dedupes_00000_json[["pl"]], file.path(temp_directory, paste0("dedupes_00000_",dp_name,".json")))
-      
-      # write dedupes 00001
-      write(import_files_json$dedupes_00001_json[["pl"]], file.path(temp_directory, paste0("dedupes_00001_",dp_name,".json")))
-      
-      # create the zip file
-      zip::zip(
-        zipfile = file,
-        files = dir(temp_directory),
-        root = temp_directory
-      )
-    }, contentType = "application/zip"
-  )
-  
-  # download imports output ----
-  # output$download_i <- renderUI({
-  # 
-  #   if (!is.null(validation_results$import)) {
-  # 
-  #     downloadButton("download_imports_output", "Download Console Output")
-  # 
-  #   } else {
-  #     NULL
-  #   }
-  # 
-  # })
-  
-  output$download_i <- downloadHandler(
-    filename = function() {
-      paste('console_output_', Sys.Date(), '.csv', sep='')
-    },
-    content = function(con) {
-      fwrite(validation_results$import, con)
-    }
-  )
-  
-  
-  
-  # logout process ----
-  observeEvent(input$logout_button, {
-    flog.info(
-      paste0(
-        "User ",
-        user_input$d2_session$me$userCredentials$username,
-        " logged out."
-      )
-    )
-    user_input$authenticated  <-  FALSE
-    user_input$user_name <- ""
-    user_input$authorized  <-  FALSE
-    user_input$d2_session  <-  NULL
-    d2_default_session <- NULL
-    gc()
-    session$reload()
-  })
-  
-  # TESTING ----
-  #observeEvent(input$test, {
-    # test reactive value is captured
-    #print(user_input$d2_session$base_url)
-    #print(deletes_json())
-    #print(deletes())
-  #})
 }
 
+
+# TESTING 
+#observeEvent(input$test, {
+# test reactive value is captured
+#print(user_input$d2_session$base_url)
+#print(deletes_json())
+#print(deletes())
+#})
+# 
+# 
+# login sidebar
+# output$ui_sidebar <- renderUI({
+#   if (user_input$authenticated == FALSE) {
+#     uiOutput("uiLoginSidebar")
+#   } else {
+#     uiOutput("authenticatedSidebar")
+#   }
+# })
+# 
+# # authenticated  sidebar
+# output$authenticated_sidebar <- renderUI({
+#   sidebarMenu(
+#     menuItem("OPU Datapack Imports", tabName = "dashboard", icon = icon("dashboard"))
+#   )
+# })
+# 
+# # login sidebar
+# output$uiLoginSidebar <- renderUI({
+#   sidebarMenu(
+#     menuItem("Login Screen", tabName = "login", icon = icon("dashboard"))
+#   )
+# })

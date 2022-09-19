@@ -10,7 +10,7 @@ library(shinydashboard)
 # )
 
 ui <- dashboardPage(
-  dashboardHeader(title = "OPU Datapack Importer",
+  dashboardHeader(title = "Datapack Import App",
                   tags$li(
                     a(
                       img(
