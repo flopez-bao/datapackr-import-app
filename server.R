@@ -6,7 +6,7 @@ library(shinyjs)
 library(datapackr)
 library(httr)
 library(data.table)
-
+library(shinydashboard)
 
 options("scipen" = 999)
 
@@ -24,6 +24,12 @@ USER = "Global"
 server <- function(input, output, session) {
   
   # data ----
+  
+  # btn data
+  validated <- 0
+  imported <- 0
+  
+  # results and msgs
   user <- reactiveValues(type = NULL)
   route <- reactiveValues(route = "triage")
   ready <- reactiveValues(ok = FALSE)
@@ -43,38 +49,71 @@ server <- function(input, output, session) {
   
   # ui ----
   
-  # login page with username and password
-  output$uiLogin  <-  renderUI({
-    fluidPage(
-      tags$head(tags$script(HTML(jscode))),
-      wellPanel(
-      fluidRow(
-        h4(
-          "Use this app to test DATIM imports in triage and conduct DATIM imports in production (Currently only runs for datapacks):"
-        ),
-        br()
-      ),
-      fluidRow(
-        selectInput("server", "Choose Server", choices = c("triage", "prod")),
-        textInput("user_name", "Username: ", width = "500px"),
-        passwordInput("password", "Password:", width = "500px"),
-        actionButton("login_button", "Log in!")
-      )
-    ))
-  })
-  
-  # is the user authenticated
+  ## authentication screen ----
   output$ui <- renderUI({
     if (user_input$authenticated == FALSE) {
       uiOutput("uiLogin")
+      #uiOutput("authenticated")
+      
     } else {
+      #uiOutput("authenticated")
       uiOutput("authenticated")
     }
   })
   
-  # main screen
+  ## authentication sidebar  ----
+  output$ui_sidebar <- renderUI({
+    if (user_input$authenticated == FALSE) {
+      uiOutput("uiLoginSidebar")
+    } else {
+      uiOutput("authenticatedSidebar")
+    }
+  })
+  
+  ## authenticated  sidebar ----
+  output$authenticated_sidebar <- renderUI({
+    sidebarMenu(
+      menuItem("OPU Datapack Imports", tabName = "dashboard", icon = icon("dashboard"))
+    )
+  })
+  
+  ## login sidebar ----
+  output$uiLoginSidebar <- renderUI({
+    sidebarMenu(
+      menuItem("Login Screen", tabName = "login", icon = icon("dashboard"))
+    )
+  })
+  
+  
+  # login page with username and password
+  output$uiLogin  <-  renderUI({
+    # tabItems(
+    #   tabItem(tabName = "login",
+              fluidPage(
+                titlePanel(title = "OPU Datapack Import App"),
+                tags$head(tags$script(HTML(jscode))),
+                wellPanel(
+                  fluidRow(
+                    h4(
+                      "Use this app to test DATIM imports in triage and conduct DATIM imports in production (Currently only runs for datapacks):"
+                    ),
+                    br()
+                  ),
+                  fluidRow(
+                    selectInput("server", "Choose Server", choices = c("triage", "prod")),
+                    textInput("user_name", "Username: ", width = "500px"),
+                    passwordInput("password", "Password:", width = "500px"),
+                    actionButton("login_button", "Log in!")
+                  )
+                )
+              )
+      #         )
+      # )
+  })
+  
+  # main screen ----
   output$authenticated <- renderUI({
-    fluidPage(
+    fluidPage(sidebarLayout(
       sidebarPanel(
         shinyjs::useShinyjs(),
         id = "side-panel",
@@ -85,35 +124,94 @@ server <- function(input, output, session) {
                      ".xlsx"),
           width = "240px"
         ),
-        # unpack and return all the warnings and messages
-        actionButton("validate", "Validate"),
-        # import into the respective server
-        actionButton("import", "Import"),
-        #download import json files
-        downloadButton("download", "Download"),
-        uiOutput("download_i")
+        h5("Import Process:"),
+        fluidRow(
+          # unpack and return all the warnings and messages
+          shinyjs::disabled(
+            actionButton("validate", "Validate")
+          ),
+          # import into the respective server
+          shinyjs::disabled(
+            actionButton("import", "Import")
+          )
+        ),
+        h5("Download Results:"),
+        fluidRow(
+          # download import json files
+          shinyjs::disabled(
+            downloadButton("download", "Download Json Files") 
+          ),
+          # download console output
+          shinyjs::disabled(
+            downloadButton("download_i", "Download Console Output") 
+          )
+          #uiOutput("download_i")
+        ),
+        br(),
+        fluidRow(
+          actionButton("logout_button", "Log out of Session", style = "color: #fff; background-color: #FF0000; border-color: #2e6da4")
+        )
         # FOR TESTING - eliminate when prod
         #actionButton("test", "TEST SOMETHING")
       ),
-      fluidRow(
-        h1(
-          paste0(
-            "You are currently logged into the ",
-            input$server, 
-            " DATIM server ",
-            "at ",
-            user_input$d2_session$base_url
-          )
-        ),
-        uiOutput("info")
+      mainPanel(fluidRow(h1(
+        paste0(
+          "You are currently logged into the ",
+          input$server,
+          " DATIM server ",
+          "at ",
+          user_input$d2_session$base_url
+        )
       ),
+      uiOutput("info")),
+      # fluidRow(
+      #   textOutput("import_output")
+      # ),
       fluidRow(
         uiOutput("messages")
-      ),
-    fluidRow(column(
-      actionButton("logout_button", "Log out of Session", style = "color: #fff; background-color: #FF0000; border-color: #2e6da4"),
-      width = 6
-    )))
+        )
+      )
+    ))
+    #fluidPage(
+      # sidebarPanel(
+      #   shinyjs::useShinyjs(),
+      #   id = "side-panel",
+      #   fileInput(
+      #     "file1",
+      #     "Choose DataPack (Must be XLSX!):",
+      #     accept = c("application/xlsx",
+      #                ".xlsx"),
+      #     width = "240px"
+      #   ),
+      #   # unpack and return all the warnings and messages
+      #   actionButton("validate", "Validate"),
+      #   # import into the respective server
+      #   actionButton("import", "Import"),
+      #   #download import json files
+      #   downloadButton("download", "Download"),
+      #   uiOutput("download_i")
+      #   # FOR TESTING - eliminate when prod
+      #   #actionButton("test", "TEST SOMETHING")
+      # ),
+    #   fluidRow(
+    #     h1(
+    #       paste0(
+    #         "You are currently logged into the ",
+    #         input$server, 
+    #         " DATIM server ",
+    #         "at ",
+    #         user_input$d2_session$base_url
+    #       )
+    #     ),
+    #     uiOutput("info")
+    #   ),
+    #   fluidRow(
+    #     uiOutput("messages")
+    #   ),
+    # fluidRow(column(
+    #   actionButton("logout_button", "Log out of Session", style = "color: #fff; background-color: #FF0000; border-color: #2e6da4"),
+    #   width = 6
+    # )))
   })
   
   # actions ----
@@ -266,8 +364,15 @@ server <- function(input, output, session) {
   
   # button management ----
   
-  # validation ----
+  observeEvent(input$file1, {
+    shinyjs::enable("validate")
+  })
+  
+  ## validation ----
   observeEvent(input$validate, {
+    
+    # disable validation
+    shinyjs::disable("validate")
     
     print("beginning validation...")
     
@@ -286,18 +391,30 @@ server <- function(input, output, session) {
     import_files_json$dedupes_00000_json <- prepJson(validation_results$datapack$import_files$dedupes_00000)
     import_files_json$dedupes_00001_json <- prepJson(validation_results$datapack$import_files$dedupes_00001)
     
+    # enable import
+    shinyjs::enable("import")
+    
   })
   
-  # import ----
+  ## import ----
   observeEvent(input$import, {
-    print("attempting import...")
-    validation_results$import <- importToDatim(
-      d = validation_results$datapack,
-      server = input$server,
-      import_data_json = import_files_json,
-      import_data = import_files,
-      d2session = user_input$d2_session
-    )
+    #output$import_output <- renderPrint({
+      shinyjs::disable("import")
+      print("attempting import...")
+      validation_results$import <- importToDatim(
+        d = validation_results$datapack,
+        server = input$server,
+        import_data_json = import_files_json,
+        import_data = import_files,
+        d2session = user_input$d2_session
+      )
+      
+      if(!is.null(validation_results$import)) {
+        shinyjs::enable("download")
+        shinyjs::enable("download_i")
+      }
+    #})
+    
     
     
   })
@@ -320,46 +437,47 @@ server <- function(input, output, session) {
   
   # messages ----
   output$messages <- renderUI({
-    
-    vr <- validation_results$datapack
-    
-    messages <- NULL
-    
-    if (is.null(vr)) {
-      return(NULL)
-    }
-    
-    if (inherits(vr, "error")) {
-      return(paste0("ERROR! ", vr$message))
       
-    } else {
+      vr <- validation_results$datapack
       
-      messages <- vr %>%
-        purrr::pluck(., "info") %>%
-        purrr::pluck(., "messages")
+      messages <- NULL
       
-      
-      if (length(messages$message) > 0) {
-        
-        class(messages) <- "data.frame"
-        
-        messages %<>%
-          dplyr::mutate(level = factor(level, levels = c("ERROR", "WARNING", "INFO"))) %>%
-          dplyr::arrange(level) %>%
-          dplyr::mutate(msg_html =
-                          dplyr::case_when(
-                            level == "ERROR" ~ paste('<li><p style = "color:red"><b>', message, "</b></p></li>"),
-                            TRUE ~ paste("<li><p>", message, "</p></li>")
-                          ))
-        
-        messages_sorted <-
-          paste0("<ul>", paste(messages$msg_html, sep = "", collapse = ""), "</ul>")
-        
-        shiny::HTML(messages_sorted)
-      } else {
-        tags$li("No Issues with Integrity Checks: Congratulations!")
+      if (is.null(vr)) {
+        return(NULL)
       }
-    }
+      
+      if (inherits(vr, "error")) {
+        return(paste0("ERROR! ", vr$message))
+        
+      } else {
+        
+        messages <- vr %>%
+          purrr::pluck(., "info") %>%
+          purrr::pluck(., "messages")
+        
+        
+        if (length(messages$message) > 0) {
+          
+          class(messages) <- "data.frame"
+          
+          messages %<>%
+            dplyr::mutate(level = factor(level, levels = c("ERROR", "WARNING", "INFO"))) %>%
+            dplyr::arrange(level) %>%
+            dplyr::mutate(msg_html =
+                            dplyr::case_when(
+                              level == "ERROR" ~ paste('<li><p style = "color:red"><b>', message, "</b></p></li>"),
+                              TRUE ~ paste("<li><p>", message, "</p></li>")
+                            ))
+          
+          messages_sorted <-
+            paste0("<ul>", paste(messages$msg_html, sep = "", collapse = ""), "</ul>")
+          
+          shiny::HTML(messages_sorted)
+        } else {
+          tags$li("No Issues with Integrity Checks: Congratulations!")
+        }
+      }
+   
     
   })
   
@@ -398,19 +516,19 @@ server <- function(input, output, session) {
   )
   
   # download imports output ----
-  output$download_i <- renderUI({
-
-    if (!is.null(validation_results$import)) {
-
-      downloadButton("download_imports_output", "Download Console Output")
-
-    } else {
-      NULL
-    }
-
-  })
+  # output$download_i <- renderUI({
+  # 
+  #   if (!is.null(validation_results$import)) {
+  # 
+  #     downloadButton("download_imports_output", "Download Console Output")
+  # 
+  #   } else {
+  #     NULL
+  #   }
+  # 
+  # })
   
-  output$download_imports_output <- downloadHandler(
+  output$download_i <- downloadHandler(
     filename = function() {
       paste('console_output_', Sys.Date(), '.csv', sep='')
     },

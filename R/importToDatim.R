@@ -146,8 +146,8 @@ importToDatim <- function(d, server, import_data_json, import_data, d2session) {
   
   })
   
-  import_results_a <<- import_results
-  res <<- do.call(rbind, import_results)
+  #import_results_a <<- import_results
+  res <- do.call(rbind, import_results)
   return(res)
   
 }
