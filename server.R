@@ -5,6 +5,8 @@ library(datimutils)
 library(shinyjs)
 library(datapackr)
 library(httr)
+library(data.table)
+
 
 options("scipen" = 999)
 
@@ -25,7 +27,7 @@ server <- function(input, output, session) {
   user <- reactiveValues(type = NULL)
   route <- reactiveValues(route = "triage")
   ready <- reactiveValues(ok = FALSE)
-  validation_results <- reactiveValues(datapack = NULL)
+  validation_results <- reactiveValues(datapack = NULL, import = NULL)
   
   # import files json
   import_files <- reactiveValues()
@@ -88,7 +90,8 @@ server <- function(input, output, session) {
         # import into the respective server
         actionButton("import", "Import"),
         #download import json files
-        downloadButton("download", "Download")#,
+        downloadButton("download", "Download"),
+        uiOutput("download_i")
         # FOR TESTING - eliminate when prod
         #actionButton("test", "TEST SOMETHING")
       ),
@@ -262,14 +265,11 @@ server <- function(input, output, session) {
   })
   
   # button management ----
-  observeEvent(input$file1, {
-    shinyjs::show("validate")
-    shinyjs::enable("validate")
-    ready$ok <- FALSE
-  })
   
   # validation ----
   observeEvent(input$validate, {
+    
+    print("beginning validation...")
     
     # store validation results
     validation_results$datapack <- validate(file = input$file1, d2_session = user_input$d2_session)
@@ -291,13 +291,31 @@ server <- function(input, output, session) {
   # import ----
   observeEvent(input$import, {
     print("attempting import...")
-    importToDatim(
+    validation_results$import <- importToDatim(
       d = validation_results$datapack,
       server = input$server,
       import_data_json = import_files_json,
       import_data = import_files,
       d2session = user_input$d2_session
     )
+    
+    
+  })
+  
+  # results ----
+  output$results <- renderUI({
+    ir <- validation_results$import
+    
+    messages <- NULL
+    
+    if (is.null(ir)) {
+      return(NULL)
+    } else {
+      unlist(as.character(ir))
+    }
+    
+    
+    
   })
   
   # messages ----
@@ -377,6 +395,28 @@ server <- function(input, output, session) {
         root = temp_directory
       )
     }, contentType = "application/zip"
+  )
+  
+  # download imports output ----
+  output$download_i <- renderUI({
+
+    if (!is.null(validation_results$import)) {
+
+      downloadButton("download_imports_output", "Download Console Output")
+
+    } else {
+      NULL
+    }
+
+  })
+  
+  output$download_imports_output <- downloadHandler(
+    filename = function() {
+      paste('console_output_', Sys.Date(), '.csv', sep='')
+    },
+    content = function(con) {
+      fwrite(validation_results$import, con)
+    }
   )
   
   

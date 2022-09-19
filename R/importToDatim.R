@@ -13,6 +13,35 @@
 
 importToDatim <- function(d, server, import_data_json, import_data, d2session) {
   
+  # temporary functions ----
+  cbind.fill <- function(...){
+    nm <- list(...) 
+    nm <- lapply(nm, as.matrix)
+    n <- max(sapply(nm, nrow)) 
+    do.call(cbind, lapply(nm, function (x) 
+      rbind(x, matrix(, n-nrow(x), ncol(x))))) 
+  }
+  
+  unPackTaskSummary <- function(ts) {
+    return(
+      data.frame(
+        cbind.fill(
+          data.frame("responseType" = ts$responseType),
+          data.frame("status" = ts$status),
+          data.frame("description" = ts$description),
+          data.frame("dataSetComplete" = ts$dataSetComplete),
+          as.data.frame(do.call(cbind, ts$importOptions)),
+          as.data.frame(do.call(cbind, ts$importCount)),
+          as.data.frame(do.call(cbind, ts$conflicts))
+        )
+      )
+      
+    )
+  }
+  
+  # initiate list
+  import_results <- list()
+  
   withProgress(message = "importing data", value = 0, {
     
   # deleting ----
@@ -33,10 +62,13 @@ importToDatim <- function(d, server, import_data_json, import_data, d2session) {
   pollImportStatus(r, d2_session = d2session)
   print("getting task summary...")
   ts <- getTaskSummary(r, d2_session = d2session)
+  # capture task results
+  import_results$deletes <- unPackTaskSummary(ts)
   print(ts)
   if (ts$importCount$deleted != NROW(import_data$deletes)) {
     warning("Deleted count did not match the number of deletes!")
   }
+  rm(ts)
   
   # importing main ----
   incProgress(0.25, detail = ("Importing main data..."))
@@ -54,7 +86,10 @@ importToDatim <- function(d, server, import_data_json, import_data, d2session) {
   httr::content(r)
   pollImportStatus(r, d2_session = d2session)
   ts <- getTaskSummary(r, d2_session = d2session)
+  # capture task results
+  import_results$main <- unPackTaskSummary(ts)
   print(ts)
+  rm(ts)
   
   # importing dedupe data 00000 ----
   incProgress(0.25, detail = ("Importing dedupes 00000..."))
@@ -72,7 +107,10 @@ importToDatim <- function(d, server, import_data_json, import_data, d2session) {
   httr::content(r)
   pollImportStatus(r, d2_session = d2session)
   ts <- getTaskSummary(r, d2_session = d2session)
+  # capture task results
+  import_results$dedupe_0000 <- unPackTaskSummary(ts)
   print(ts)
+  rm(ts)
   
   # importing dedupe data 0001 ----
   incProgress(0.1, detail = ("Importing dedupes 00001..."))
@@ -89,7 +127,10 @@ importToDatim <- function(d, server, import_data_json, import_data, d2session) {
   httr::content(r)
   pollImportStatus(r, d2_session = d2session)
   ts <- getTaskSummary(r, d2_session = d2session)
+  # capture task results
+  import_results$dedupe_0001 <- unPackTaskSummary(ts)
   print(ts)
+  rm(ts)
   
   
   # checks----
@@ -104,5 +145,9 @@ importToDatim <- function(d, server, import_data_json, import_data, d2session) {
               "values differed between DATIM and the Datapack."))
   
   })
+  
+  import_results_a <<- import_results
+  res <<- do.call(rbind, import_results)
+  return(res)
   
 }
