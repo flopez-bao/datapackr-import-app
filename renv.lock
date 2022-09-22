@@ -58,20 +58,6 @@
       "Repository": "CRAN",
       "Hash": "543776ae6848fde2f48ff3816d0628bc"
     },
-    "bit": {
-      "Package": "bit",
-      "Version": "4.0.4",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "f36715f14d94678eea9933af927bc15d"
-    },
-    "bit64": {
-      "Package": "bit64",
-      "Version": "4.0.5",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "9fe98599ca456d6552421db0d6772d8f"
-    },
     "brio": {
       "Package": "brio",
       "Version": "1.1.3",
@@ -114,13 +100,6 @@
       "Repository": "CRAN",
       "Hash": "23abf173c2b783dcc43379ab9bba00ee"
     },
-    "clipr": {
-      "Package": "clipr",
-      "Version": "0.8.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "3f038e5ac7f41d4ac41ce658c85e3042"
-    },
     "commonmark": {
       "Package": "commonmark",
       "Version": "1.7",
@@ -158,28 +137,28 @@
     },
     "datapackr": {
       "Package": "datapackr",
-      "Version": "5.2.0",
+      "Version": "5.3.0",
       "Source": "GitHub",
-      "RemoteType": "github",
       "Remotes": "pepfar-datim/datimutils, pepfar-datim/datim-validation",
+      "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteRepo": "datapackr",
       "RemoteUsername": "pepfar-datim",
-      "RemoteRef": "master",
-      "RemoteSha": "11248b7138a98a4e1ba72e780ebf16ebb906ed61",
-      "Hash": "a355c375586c5f2ec1a6f808642c8ef7"
+      "RemoteRef": "DP-784-hotfix",
+      "RemoteSha": "d7518851d150847c051ac113bb9976aef6df2642",
+      "Hash": "f1865a0401b498715d5146af58feaed5"
     },
     "datimutils": {
       "Package": "datimutils",
-      "Version": "0.2.0",
+      "Version": "0.6.0",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteRepo": "datimutils",
       "RemoteUsername": "pepfar-datim",
-      "RemoteRef": "master",
-      "RemoteSha": "17819c99e325122d4e805fccb9772f82ec4613d2",
-      "Hash": "a5634e65790065876b25d6c43c34e2e6"
+      "RemoteRef": "HEAD",
+      "RemoteSha": "3346faec3d1c0a6d180a1b60cab4176c2b27fa95",
+      "Hash": "80f3a1d81d28e1bd0861211b7dc7dd1b"
     },
     "datimvalidation": {
       "Package": "datimvalidation",
@@ -273,10 +252,10 @@
     },
     "fs": {
       "Package": "fs",
-      "Version": "1.5.0",
+      "Version": "1.5.2",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "44594a07a42e5f91fac9f93fda6d0109"
+      "Hash": "7c89603d81793f0d5486d91ab1fc6f1d"
     },
     "futile.logger": {
       "Package": "futile.logger",
@@ -396,13 +375,6 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "f36bf1a849d9106dc2af72e501f9de41"
-    },
-    "lazyeval": {
-      "Package": "lazyeval",
-      "Version": "0.2.2",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "d908914ae53b04d4c0c0fd72ecc35370"
     },
     "lifecycle": {
       "Package": "lifecycle",
@@ -574,10 +546,10 @@
     },
     "pkgload": {
       "Package": "pkgload",
-      "Version": "1.2.4",
+      "Version": "1.3.0",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "7533cd805940821bf23eaf3c8d4c1735"
+      "Hash": "4b20f937a363c78a5730265c1925f54a"
     },
     "plyr": {
       "Package": "plyr",
@@ -642,13 +614,6 @@
       "Repository": "CRAN",
       "Hash": "5e3c5dc0b071b21fa128676560dbe94d"
     },
-    "readr": {
-      "Package": "readr",
-      "Version": "2.1.2",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "9c59de1357dc209868b5feb5c9f0fe2f"
-    },
     "readxl": {
       "Package": "readxl",
       "Version": "1.4.0",
@@ -686,10 +651,10 @@
     },
     "rlang": {
       "Package": "rlang",
-      "Version": "1.0.2",
+      "Version": "1.0.5",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "04884d9a75d778aca22c7154b8333ec9"
+      "Hash": "971c3d698fc06dabdac6bc4bcda72dc4"
     },
     "rlist": {
       "Package": "rlist",
@@ -831,13 +796,6 @@
       "Repository": "CRAN",
       "Hash": "284994639932d61c0dc765c9aa401d1b"
     },
-    "tzdb": {
-      "Package": "tzdb",
-      "Version": "0.3.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "b2e1cbce7c903eaf23ec05c58e59fb5e"
-    },
     "utf8": {
       "Package": "utf8",
       "Version": "1.2.2",
@@ -858,13 +816,6 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "8b54f22e2a58c4f275479c92ce041a57"
-    },
-    "vroom": {
-      "Package": "vroom",
-      "Version": "1.5.7",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "976507b5a105bc3bdf6a5a5f29e0684f"
     },
     "waldo": {
       "Package": "waldo",

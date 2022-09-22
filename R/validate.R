@@ -67,18 +67,19 @@ validate <- function(file, d2_session) {
       # extract data for import
       data <- d$datim$MER %>% 
         dplyr::bind_rows(d$datim$subnat_impatt)
-      
+      print("mer data exrtracted")
       #Remap mech codes to UIDs
       
       data$attributeOptionCombo <-
         datimvalidation::remapCategoryOptionCombos(data$attributeOptionCombo,
                                                    "code", "id", d2session = d2_session)
-      
+      print("datimvalidation ran")
       # double check all category option combos are uids, no "default" or mech codes
       assertthat::assert_that(
         all(datapackr::is_uidish(data$attributeOptionCombo)))
       assertthat::assert_that(
         all(datapackr::is_uidish(data$categoryOptionCombo)))
+      print("assertions complete")
       
       # drop dedupe from main import
       d$import_files$main_import <-
@@ -87,10 +88,12 @@ validate <- function(file, d2_session) {
                                                     "YGT1o7UxfFu"))) %>%
         dplyr::mutate(value = as.character(value))
       
+      print("dedupe drop complete")
+      
       d$import_files$dedupes_00000 <- dplyr::filter(data, attributeOptionCombo == "X8hrDf6bLDC")
       
       d$import_files$dedupes_00001 <- dplyr::filter(data, attributeOptionCombo == "YGT1o7UxfFu")
-      
+
       # delete prior cop subnat data
       # delete any pre existing COP22 data, generally only has impact
       # if we are reloading the DP

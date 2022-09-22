@@ -354,6 +354,15 @@ server <- function(input, output, session) {
     # enable import
     shinyjs::enable("import")
     
+    if(!is.null(validation_results$datapack)) {
+      showModal(modalDialog(
+        title = "VALIDATION COMPLETE",
+        "Your datapack has been unpacked and validated! Check the warnings and information below.",
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
+    
   })
   
   ## import ----
@@ -372,6 +381,12 @@ server <- function(input, output, session) {
       if(!is.null(validation_results$import)) {
         shinyjs::enable("download")
         shinyjs::enable("download_i")
+        showModal(modalDialog(
+          title = "IMPORT COMPLETE",
+          "Your datapack has been imported. You can now download a console output report csv as well as json import files.",
+          easyClose = TRUE,
+          footer = NULL
+        ))
       }
     #})
     
