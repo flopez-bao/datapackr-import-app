@@ -1,3 +1,22 @@
+#' Title getBaseURL()
+#'
+#' @return A base URL to be used throughout the application. If the BASE_URL
+#' environment variable is not set,
+#' this function will return https://www.datim.org,
+#' otherwise, the value of the environment variable.
+#' @export
+#'
+getBaseURL <- function() {
+  if (Sys.getenv("BASE_URL") !=  "")  {
+    return(Sys.getenv("BASE_URL"))
+  } else {
+    futile.logger::flog.warn("No BASE_URL environment variable found. Using www.datim.org")
+    
+    return("https://www.datim.org/")
+    
+  }
+}
+
 #' @export
 #' @title getTaskSummary(r, d2_session)
 #'

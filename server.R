@@ -13,6 +13,35 @@ options(
   shiny.maxRequestSize=30*1024^2
   )
 
+################ OAuth Client information #####################################
+if (interactive()) {
+  # testing url
+  options(shiny.port = 3123)
+  APP_URL <- "http://127.0.0.1:3123/"# This will be your local host path
+} else {
+  # deployed URL
+  APP_URL <- Sys.getenv("APP_URL") #This will be your shiny server path
+}
+
+oauth_app <- httr::oauth_app(Sys.getenv("OAUTH_APPNAME"),
+                             key = Sys.getenv("OAUTH_KEYNAME"),   # dhis2 = Client ID
+                             secret = Sys.getenv("OAUTH_SECRET"), # dhis2 = Client Secret
+                             redirect_uri = APP_URL)
+
+
+oauth_api <- httr::oauth_endpoint(base_url = paste0(Sys.getenv("PROD_BASE_URL"), "uaa/oauth"),
+                                  request = NULL, # Documentation says to leave this NULL for OAuth2
+                                  authorize = "authorize",
+                                  access = "token")
+
+oauth_scope <- "ALL"
+
+
+has_auth_code <- function(params) {
+  
+  return(!is.null(params$code))
+}
+
 # js ----
 # allows for using the enter button
 jscode <- '$(document).keyup(function(e) {
@@ -48,6 +77,24 @@ server <- function(input, output, session) {
   
   # ui ----
   
+  ## redirect ----
+  output$ui_redirect <- renderUI({
+    #print(input$login_button_oauth) #useful for debugging
+    if (!is.null(input$login_button_oauth)) {
+      if (input$login_button_oauth > 0) {
+        url <-
+          httr::oauth2.0_authorize_url(oauth_api, oauth_app, scope = oauth_scope)
+        print(url)
+        redirect <- sprintf("location.replace(\"%s\");", url)
+        tags$script(HTML(redirect))
+      } else  {
+        NULL
+      }
+    } else  {
+      NULL
+    }
+  })
+  
   ## auth switch ----
   output$ui <- renderUI({
     if (user_input$authenticated == FALSE) {
@@ -70,15 +117,18 @@ server <- function(input, output, session) {
                 wellPanel(
                   fluidRow(
                     h4(
-                      "Use this app to test DATIM imports in triage and conduct DATIM imports in production (Currently only runs for datapacks):"
+                      "Use this app to test DATIM imports in triage and conduct FULL DATIM imports in production;
+                      currently only runs for datapacks and prod pointed to cop-test. Note that triage will allow
+                      login via username and password but prod login will require oauth:"
                     ),
                     br()
                   ),
                   fluidRow(
                     selectInput("server", "Choose Server", choices = c("triage", "prod")),
-                    textInput("user_name", "Username: ", width = "500px"),
-                    passwordInput("password", "Password:", width = "500px"),
-                    actionButton("login_button", "Log in!")
+                    #actionButton("login_button_oauth", "Log in with DATIM"),
+                    uiOutput("login_button"),
+                    uiOutput("ui_hasauth"),
+                    uiOutput("ui_redirect")
                   )
                 )
               )
@@ -173,87 +223,51 @@ server <- function(input, output, session) {
     }
   })
   
-  ## login process ----
+  ## login triage ----
+  # this is separated since triage login uses uname and pwd
   observeEvent(input$login_button, {
-    
-    print(paste0("login into...", input$server))
-    
     tryCatch({
-      if (route$route == "triage") {
+      print(paste0("login into...", input$server))
+      
+      datimutils::loginToDATIM(
+        base_url = Sys.getenv("TRIAGE_BASE_URL"),
+        username = input$user_name,
+        password = input$password,
+        d2_session_envir = parent.env(environment())
+      )
+      
+      ### check user rights and kick them out if not allowed ----
+      # store data so call is made only once
+      user$type <- datimutils::getMyUserType()
+      
+      # if a user is not to be allowed deny them entry
+      if (user$type != USER) {
+        # alert the user they cannot access the app
+        sendSweetAlert(session,
+                       title = "YOU CANNOT LOG IN",
+                       text = "You are not authorized to use this application",
+                       type = "error")
         
-        datimutils::loginToDATIM(
-          base_url = Sys.getenv("TRIAGE_BASE_URL"),
-          username = input$user_name,
-          password = input$password,
-          d2_session_envir = parent.env(environment())
-        )
-        
-        ### check user rights and kick them out if not allowed ----
-        # store data so call is made only once
-        user$type <- datimutils::getMyUserType()
-        
-        # if a user is not to be allowed deny them entry
-        if (user$type != USER) {
-          
-          # alert the user they cannot access the app
-          sendSweetAlert(
-            session,
-            title = "YOU CANNOT LOG IN",
-            text = "You are not authorized to use this application",
-            type = "error"
+        # log them out
+        Sys.sleep(3)
+        flog.info(
+          paste0(
+            "User ",
+            user_input$d2_session$me$userCredentials$username,
+            " logged out."
           )
-          
-          # log them out
-          Sys.sleep(3)
-          flog.info(paste0("User ", user_input$d2_session$me$userCredentials$username, " logged out."))
-          user_input$authenticated  <-  FALSE
-          user_input$user_name <- ""
-          user_input$authorized  <-  FALSE
-          user_input$d2_session  <-  NULL
-          d2_default_session <- NULL
-          gc()
-          session$reload()
-          
-        }
-        
-      } else if (route$route == "prod") {
-        
-        datimutils::loginToDATIM(
-          base_url = Sys.getenv("PROD_BASE_URL"),
-          username = input$user_name,
-          password = input$password,
-          d2_session_envir = parent.env(environment())
         )
-        
-        ### check user rights and kick them out if not allowed ----
-        # store data so call is made only once
-        user$type <- datimutils::getMyUserType()
-        
-        # if a user is not to be allowed deny them entry
-        if (user$type != USER) {
-          
-          # alert the user they cannot access the app
-          sendSweetAlert(
-            session,
-            title = "YOU CANNOT LOG IN",
-            text = "You are not authorized to use this application",
-            type = "error"
-          )
-          
-          # log them out
-          Sys.sleep(3)
-          flog.info(paste0("User ", user_input$d2_session$me$userCredentials$username, " logged out."))
-          user_input$authenticated  <-  FALSE
-          user_input$user_name <- ""
-          user_input$authorized  <-  FALSE
-          user_input$d2_session  <-  NULL
-          d2_default_session <- NULL
-          gc()
-          session$reload()
-          
-        }
+        user_input$authenticated  <-  FALSE
+        user_input$user_name <- ""
+        user_input$authorized  <-  FALSE
+        user_input$d2_session  <-  NULL
+        d2_default_session <- NULL
+        gc()
+        session$reload()
         
       }
+      
+      
     },
     # This function throws an error if the login is not successful
     error = function(e) {
@@ -282,7 +296,6 @@ server <- function(input, output, session) {
           name = "datapack"
         )
       }
-      
     } else {
       sendSweetAlert(session,
                      title = "Login failed",
@@ -291,8 +304,93 @@ server <- function(input, output, session) {
     }
   })
   
+  ## login process ----
+  observeEvent(input$login_button_oauth > 0, {
+    
+    print(paste0("login button status:", input$login_button_oauth))
+    
+    tryCatch({
+      
+      print(paste0(
+        "login into...",
+        input$server,
+        " at ",
+        Sys.getenv("PROD_BASE_URL")
+      ))
+
+      #Grabs the code from the url
+      params <- parseQueryString(session$clientData$url_search)
+      #Wait until the auth code actually exists
+      req(has_auth_code(params))
+      
+      #Manually create a token
+      token <- httr::oauth2.0_token(
+        app = oauth_app,
+        endpoint = oauth_api,
+        scope = oauth_scope,
+        use_basic_auth = TRUE,
+        oob_value = APP_URL,
+        cache = FALSE,
+        credentials = httr::oauth2.0_access_token(
+          endpoint = oauth_api,
+          app = oauth_app,
+          code = params$code,
+          use_basic_auth = TRUE
+        )
+      )
+      
+      loginAttempt <- tryCatch({
+        datimutils::loginToDATIMOAuth(
+          base_url =  Sys.getenv("PROD_BASE_URL"),
+          token = token,
+          app = oauth_app,
+          api = oauth_api,
+          redirect_uri = APP_URL,
+          scope = oauth_scope,
+          d2_session_envir = parent.env(environment())
+        )
+        
+      },
+      # This function throws an error if the login is not successful
+      error = function(e) {
+        flog.info(paste0("User login failed. ", e$message), name = "datapack")
+      })
+      
+      #print(loginAttempt)
+      is_authorized <-
+        if (!is.null(loginAttempt$token)) {
+          TRUE
+        } else {
+          FALSE
+        }
+      #print(is_authorized)
+      
+      if (exists("d2_default_session") && is_authorized) {
+        user_input$authenticated  <-  TRUE
+        user_input$d2_session  <-  d2_default_session$clone()
+        d2_default_session <- NULL
+        
+      } else {
+        sendSweetAlert(session,
+                       title = "Login Failed",
+                       text = "You are not authorized to use this application",
+                       type = "error")
+      }
+      
+    },
+    # This function throws an error if the login is not successful
+    error = function(e) {
+      flog.info(paste0("User ", input$username, " login failed."), name = "datapack")
+    })
+    
+    
+  })
+  
   ## logout process ----
   observeEvent(input$logout_button, {
+    req(input$logout_button)
+    # Gets you back to the login without the authorization code at top
+    updateQueryString("?", mode = "replace", session = session)
     flog.info(
       paste0(
         "User ",
@@ -307,11 +405,26 @@ server <- function(input, output, session) {
     d2_default_session <- NULL
     gc()
     session$reload()
+    
   })
   
 
   
   # button management ----
+  
+  ## login button ----
+  output$login_button <- renderUI({
+    
+    if(input$server != "prod") {
+      fluidPage(
+        textInput("user_name", "Username: ", width = "500px"),
+        passwordInput("password", "Password:", width = "500px"),
+        actionButton("login_button", "Log in!")
+      )
+    } else {
+      actionButton("login_button_oauth", "Log in with DATIM")
+    }
+  })
   
   ## turn on validate ----
   observeEvent(input$file1, {
