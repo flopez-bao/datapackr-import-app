@@ -89,6 +89,17 @@ server <- function(input, output, session) {
   #   }
   # })
   
+  ## triage sync info ----
+  output$triage_sync_info <- renderUI({
+    if(user_input$d2_session$base_url == Sys.getenv("TRIAGE_BASE_URL")) {
+      fluidRow(
+        h4(paste0("Last Triage Sync: ", triage_sync$triage_sync))
+      )
+    } else {
+      NULL
+    }
+  })
+  
   ## redirect ----
   output$ui_redirect <- renderUI({
     #print(input$login_button_oauth) #useful for debugging
@@ -203,9 +214,7 @@ server <- function(input, output, session) {
         )
       )
       ),
-      fluidRow(
-        h4(paste0("Last Triage Sync: ", triage_sync$triage_sync))
-      ),
+      uiOutput("triage_sync_info"),
       uiOutput("info"),
       br(),
       fluidRow(
