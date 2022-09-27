@@ -10,7 +10,7 @@ library(shinydashboard)
 
 options(
   "scipen" = 999,
-  shiny.maxRequestSize=30*1024^2
+  shiny.maxRequestSize = 150 * 1024 ^ 2
   )
 
 ################ OAuth Client information #####################################
@@ -57,6 +57,9 @@ server <- function(input, output, session) {
   
   # data and values ----
   
+  # triage sync
+  triage_sync <- reactiveValues(triage_sync = NULL)
+  
   # results and msgs
   user <- reactiveValues(type = NULL)
   route <- reactiveValues(route = "triage")
@@ -76,6 +79,15 @@ server <- function(input, output, session) {
   )
   
   # ui ----
+  
+  ## waive error check box
+  # output$checkbox <- renderUI({
+  #   if(input$server == "prod") {
+  #     shinyjs::disabled(
+  #       checkboxInput("error_waive", "Waive Error")
+  #     )
+  #   }
+  # })
   
   ## redirect ----
   output$ui_redirect <- renderUI({
@@ -162,6 +174,10 @@ server <- function(input, output, session) {
         ),
         h5("Download Results:"),
         fluidRow(
+          # check box to wave error
+          # uiOutput(
+          #   "checkbox"
+          # ),
           # download import json files
           shinyjs::disabled(
             downloadButton("download", "Download Json Files") 
@@ -186,6 +202,9 @@ server <- function(input, output, session) {
           user_input$d2_session$base_url
         )
       )
+      ),
+      fluidRow(
+        h4(paste0("Last Triage Sync: ", triage_sync$triage_sync))
       ),
       uiOutput("info"),
       br(),
@@ -235,6 +254,8 @@ server <- function(input, output, session) {
         password = input$password,
         d2_session_envir = parent.env(environment())
       )
+      
+      triage_sync$triage_sync <- lubridate::as_datetime(getMetadata(end_point = "systemSettings", retry = 3)$keyLastSuccessfulAnalyticsTablesUpdate)
       
       ### check user rights and kick them out if not allowed ----
       # store data so call is made only once
@@ -304,7 +325,7 @@ server <- function(input, output, session) {
     }
   })
   
-  ## login process ----
+  ## login prod ----
   observeEvent(input$login_button_oauth > 0, {
     
     print(paste0("login button status:", input$login_button_oauth))
