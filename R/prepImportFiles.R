@@ -1,13 +1,17 @@
 #' @export
-#' @title prepImportFiles(data)
+#' @title prepImportFiles(data, tool, type)
 #'
-#' @description Preps a json file based off the import files as data inputs. These are the jsons that are imported.
+#' @description Preps the 4 import files
 #'
-#' @param data an import file.
+#' @param d a d object result typically from a datapack being unpacked.
+#' @param tool the type of tool, Data Pack or OPU Data Pack
+#' @param the type of 
 #'
 #' @return data
 #'
 prepImportFiles <- function(d, tool, type) {
+  
+  stopifnot(d$info$tool == tool, TRUE)
   
   if( tool == "Data Pack") {
     
@@ -50,26 +54,27 @@ prepImportFiles <- function(d, tool, type) {
       
       # drop dedupe from main import
       main_import <-
-        dplyr::filter(data,
-                      !(attributeOptionCombo %in% c("X8hrDf6bLDC",
-                                                    "YGT1o7UxfFu"))) %>%
+        dplyr::filter(data, !(attributeOptionCombo %in% c("X8hrDf6bLDC", "YGT1o7UxfFu"))) %>%
         dplyr::mutate(value = as.character(value))
       
     } else if (type == "DEDUPES_00000") {
       
-      dedupes_00000 <- dplyr::filter(data,
-                                     attributeOptionCombo == "X8hrDf6bLDC")
+      dedupes_00000 <- dplyr::filter(data, attributeOptionCombo == "X8hrDf6bLDC")
       
     } else if (type == "DEDUPES_00001") {
       
-      dedupes_00001 <- dplyr::filter(data,
-                                     attributeOptionCombo == "YGT1o7UxfFu")
+      dedupes_00001 <- dplyr::filter(data, attributeOptionCombo == "YGT1o7UxfFu")
       
     } else {
       
       stop("NONE OF THESE PROCESSES ARE SUPPORTED!")
+      
     }
 
+  } else if (tool == "OPU Data Pack") {
+    
+    stop("cannot process opu yet ...")
+    
   }
  
 }

@@ -2,16 +2,20 @@
 % Please edit documentation in R/prepImportFiles.R
 \name{prepImportFiles}
 \alias{prepImportFiles}
-\title{prepImportFiles(data)}
+\title{prepImportFiles(data, tool, type)}
 \usage{
 prepImportFiles(d, tool, type)
 }
 \arguments{
-\item{data}{an import file.}
+\item{d}{a d object result typically from a datapack being unpacked.}
+
+\item{tool}{the type of tool, Data Pack or OPU Data Pack}
+
+\item{the}{type of}
 }
 \value{
 data
 }
 \description{
-Preps a json file based off the import files as data inputs. These are the jsons that are imported.
+Preps the 4 import files
 }

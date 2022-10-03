@@ -7,9 +7,9 @@
 sendPayload(data, type, d2_session)
 }
 \arguments{
-\item{data}{an import file.}
+\item{data}{an import file typically the extract from json.}
 
-\item{type}{an import file.}
+\item{type}{what type of payload is this.}
 
 \item{d2_session}{a d2 session}
 }

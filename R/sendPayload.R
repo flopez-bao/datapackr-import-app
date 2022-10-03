@@ -3,8 +3,8 @@
 #'
 #' @description ....
 #'
-#' @param data an import file.
-#' @param type an import file.
+#' @param data an import file typically the extract from json.
+#' @param type what type of payload is this.
 #' @param d2_session a d2 session
 #'
 #' @return data
