@@ -30,13 +30,13 @@ getBaseURL <- function() {
 
 getTaskSummary <- function(r, d2_session) {
   
-  ep <- content(r)$response$relativeNotifierEndpoint %>%
+  ep <- httr::content(r)$response$relativeNotifierEndpoint %>%
     stringr::str_replace(., "^/", "") %>%
     stringr::str_replace(., "tasks", "taskSummaries")
   url <- paste0(d2_session$base_url, ep)
   #Get the task summary
   
-  res <- httr::GET(url, content_type_json(), handle = d2_session$handle) %>%
+  res <- httr::GET(url, httr::content_type_json(), handle = d2_session$handle) %>%
     httr::content()
   
   return(res)
